@@ -1,84 +1,122 @@
+import hashlib
 import os
-import re
 import json
 import requests
+import threading
+import time
 from bs4 import BeautifulSoup
-from datetime import datetime
 from urllib.parse import urljoin, urlparse
-from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+import hashlib
+import hashlib
+import re
 
-# Load URLs from JSON
-with open('urls.json', 'r') as f:
-    urls = json.load(f)['urls']
+# CONFIG
+OUTPUT_DIR = "./output"
+NUM_THREADS = 5
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-# Output base folder
-timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-base_output_dir = os.path.join('output', timestamp)
-os.makedirs(base_output_dir, exist_ok=True)
+def timestamp_folder():
+    return time.strftime("%Y-%m-%d_%H-%M-%S")
 
-def sanitize_filename(url):
-    filename = re.sub(r'^https?://', '', url)
-    return re.sub(r'[^\w\-_.]', '_', filename)
+def sanitize_url(url):
+    return urlparse(url).netloc.replace('.', '-') + urlparse(url).path.replace('/', '-').strip('-')
 
-def download_asset(asset_url, save_dir):
+
+def flatten_filename(url):
+    """Flatten full asset URL path into a safe filename."""
+    parsed = urlparse(url)
+    path = parsed.path or ""
+    name = path.strip("/").replace("/", "_")
+
+    # Add file extension if missing
+    if not os.path.splitext(name)[1]:
+        name += ".bin"
+
+    # Add hash to avoid name collisions
+    hash_suffix = hashlib.md5(url.encode()).hexdigest()[:8]
+    name, ext = os.path.splitext(name)
+    return f"{name}_{hash_suffix}{ext}"
+
+def download_asset(session, base_url, tag, attr, asset_dir):
+    src = tag.get(attr)
+    if not src or src.startswith("data:"):
+        return
+
+    full_url = urljoin(base_url, src)
     try:
-        response = requests.get(asset_url, timeout=10)
+        response = session.get(full_url, timeout=10)
         response.raise_for_status()
-        parsed = urlparse(asset_url)
-        filename = os.path.basename(parsed.path) or "unnamed"
-        output_path = os.path.join(save_dir, filename)
-        with open(output_path, 'wb') as f:
+
+        filename = flatten_filename(full_url)
+        asset_path = os.path.join(asset_dir, filename)
+
+        with open(asset_path, "wb") as f:
             f.write(response.content)
-        return filename
-    except Exception as e:
-        print(f"⚠️  Failed to download asset {asset_url}: {e}")
-        return None
 
-def scrape_and_save(url):
+        # ✅ This is crucial: directly update the tag
+        tag[attr] = filename
+
+        # Optional: log to confirm
+        print(f"[✓] {tag.name} asset replaced: {src} → {filename}")
+    except Exception as e:
+        print(f"[!] Failed to download {full_url}: {e}")
+
+
+
+def scrape_page(session, url, base_output):
     try:
-        response = requests.get(url, timeout=10)
+        response = session.get(url, timeout=15)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.content, "html.parser")
 
-        urlname = sanitize_filename(url)
-        page_dir = os.path.join(base_output_dir, urlname)
-        static_dir = os.path.join(page_dir, 'static')
-        os.makedirs(static_dir, exist_ok=True)
+        asset_dir = Path(base_output)
+        asset_dir.mkdir(parents=True, exist_ok=True)
 
-        final_url = response.url
-
-        # CSS
-        for link in soup.find_all('link', href=True):
-            if 'stylesheet' in link.get('rel', []):
-                full_url = urljoin(final_url, link['href'])
-                local_path = download_asset(full_url, static_dir)
-                if local_path:
-                    link['href'] = local_path
-
-        # JS
-        for script in soup.find_all('script', src=True):
-            full_url = urljoin(final_url, script['src'])
-            local_path = download_asset(full_url, static_dir)
-            if local_path:
-                script['src'] = local_path
-
-        # Images
-        for img in soup.find_all('img', src=True):
-            full_url = urljoin(final_url, img['src'])
-            local_path = download_asset(full_url, static_dir)
-            if local_path:
-                img['src'] = local_path
+        for tag in soup.find_all(["script", "link", "img"]):
+            if tag.name == "script" and tag.get("src"):
+                download_asset(session, response.url, tag, "src", asset_dir)
+            elif tag.name == "link" and "stylesheet" in (tag.get("rel") or []):
+                download_asset(session, response.url, tag, "href", asset_dir)
+            elif tag.name == "img" and tag.get("src"):
+                download_asset(session, response.url, tag, "src", asset_dir)
 
 
-        # Save HTML
-        output_file = os.path.join(page_dir, 'index.html')
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(soup.prettify())
+        output_html = soup.prettify()
+        with open(asset_dir / "index.html", "w", encoding="utf-8") as f:
+            f.write(output_html)
 
-        print(f"✅ Saved {url} → {output_file}")
+        print(f"[+] Saved {url}")
     except Exception as e:
-        print(f"❌ Failed to scrape {url}: {e}")
+        print(f"[!] Error scraping {url}: {e}")
 
-# Run multithreaded
-with ThreadPoolExecutor(max_workers=5) as executor:
-    executor.map(scrape_and_save, urls)
+
+def worker(urls, base_folder):
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    while urls:
+        url = urls.pop()
+        folder = os.path.join(base_folder, sanitize_url(url))
+        scrape_page(session, url, folder)
+
+def main():
+    with open("urls.json", "r") as f:
+        url_list = json.load(f)
+
+    timestamped_dir = os.path.join(OUTPUT_DIR, timestamp_folder())
+    os.makedirs(timestamped_dir, exist_ok=True)
+
+    urls = url_list.copy()
+    threads = []
+    for _ in range(NUM_THREADS):
+        t = threading.Thread(target=worker, args=(urls, timestamped_dir))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
+
+    print("[✓] All done.")
+
+if __name__ == "__main__":
+    main()

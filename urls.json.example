@@ -1,7 +1,5 @@
-{
-  "urls": [
-    "https://example.com",
-    "https://example.org/some-page",
-    "http://testsite.net/page/123"
-  ]
-}
+[
+  "https://example.com",
+  "https://example.org/some-page",
+  "http://testsite.net/page/123"
+]
