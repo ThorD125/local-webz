@@ -1,3 +1,5 @@
+import threading
+import time
 import sys
 from urllib.parse import urljoin
 import requests
@@ -51,11 +53,46 @@ def attacks(resp,status,full_url,base_url, index_url):
             print_result(users_resp.status_code, users_url, f"Users: {len(users_resp.json()) if users_resp.ok else 'N/A'}")
 
 def print_default_blob_info(json_out):
-    print(json_out.keys())
+    # print(json_out.keys())
+    # print(json_out["routes"].keys())
     print(f"name: {json_out['name']}")
     print(f"description: {description}") if (description := json_out.get('description')) else None
     print(f"namespaces: {namespace}") if (namespace := json_out.get('namespaces')) else None
     print(f"authentication: {auth}") if (auth := json_out.get('authentication')) else None
+
+    print(f"[+] Found {len(json_out['routes'])} routes.\n")
+
+
+def dostuffonstatus(resp, full_url, base_url, index_url, show_all):
+    status = resp.status_code
+    data = ""
+    if status == 200:
+        attacks(resp,status,full_url,base_url, index_url)
+    elif status == 400:
+        try:
+            json_data = resp.json()
+            if isinstance(json_data, dict) and "data" in json_data and "params" in json_data["data"]:
+                params = json_data["data"]["params"]
+                data = f"Params: {params}"
+        except:
+            data = "Could not parse JSON params"
+
+        print_result(status, full_url, data)
+
+    elif show_all:
+        print_result(status, full_url, f"Length: {len(resp.content)}")
+
+def spinner_task(stop_event):
+    spinner = "|/-\\"
+    idx = 0
+    while not stop_event.is_set():
+        sys.stdout.write(f"\rProcessing... {spinner[idx % len(spinner)]}")
+        sys.stdout.flush()
+        idx += 1
+        time.sleep(0.1)
+    sys.stdout.write("\rDone!           \n")
+    sys.stdout.flush()
+
 
 def main(base_url, show_all=False):
     base_url = base_url.rstrip("/")
@@ -72,7 +109,6 @@ def main(base_url, show_all=False):
     print_default_blob_info(json_output)
 
     routes = json_output["routes"]
-    print(f"[+] Found {len(routes)} routes.\n")
 
     for route in routes:
         if not route.startswith("/"): continue
@@ -80,7 +116,7 @@ def main(base_url, show_all=False):
         full_url = urljoin(index_url, route.lstrip("/"))
         resp = fetch_json(full_url)
 
-        if isinstance(resp, str):  # error string
+        if isinstance(resp, str):
             if show_all:
                 print_result("ERR", full_url, resp)
             continue
@@ -90,25 +126,8 @@ def main(base_url, show_all=False):
                 print_result("ERR", full_url, "No response")
             continue
 
-        status = resp.status_code
-        data = ""
+        dostuffonstatus(resp, full_url, base_url, index_url, show_all)
 
-        if status == 200:
-            attacks(resp,status,full_url,base_url, index_url)
-
-        elif status == 400:
-            try:
-                json_data = resp.json()
-                if isinstance(json_data, dict) and "data" in json_data and "params" in json_data["data"]:
-                    params = json_data["data"]["params"]
-                    data = f"Params: {params}"
-            except:
-                data = "Could not parse JSON params"
-
-            print_result(status, full_url, data)
-
-        elif show_all:
-            print_result(status, full_url, f"Length: {len(resp.content)}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -118,4 +137,12 @@ if __name__ == "__main__":
     the_base_url = sys.argv[1]
     the_show_all = "--all" in sys.argv
 
-    main(the_base_url, the_show_all)
+    stop_spinner = threading.Event()
+    spinner_thread = threading.Thread(target=spinner_task, args=(stop_spinner,))
+
+    spinner_thread.start()
+    try:
+        main(the_base_url, the_show_all)
+    finally:
+        stop_spinner.set()
+        spinner_thread.join()
