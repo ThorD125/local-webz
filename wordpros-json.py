@@ -1,13 +1,12 @@
 import sys
-import requests
 from urllib.parse import urljoin
+import requests
 
 def fetch_json(url):
     if not url.startswith("http"):
         url = f"https://{url}"
 
-    url.replace("http://", "https://")
-    print(f"index_url {url}")
+    url = url.replace("http://", "https://")  # this line was ineffective before
 
     try:
         response = requests.get(url, timeout=10)
@@ -15,7 +14,22 @@ def fetch_json(url):
             return response
     except Exception as e:
         return f"ERR: {e}"
+
+    # Fallback: try index.json
+    if url.endswith("/"):
+        fallback_url = url + "index.json"
+    else:
+        fallback_url = url + "/index.json"
+
+    try:
+        response = requests.get(fallback_url, timeout=10)
+        if 'application/json' in response.headers.get('Content-Type', ''):
+            return response
+    except Exception as e:
+        return f"ERR (fallback): {e}"
+
     return None
+
 
 def print_result(status, url, extra=""):
     print(f"[{status}] {url} - {extra}")
@@ -36,6 +50,13 @@ def attacks(resp,status,full_url,base_url, index_url):
         if users_resp:
             print_result(users_resp.status_code, users_url, f"Users: {len(users_resp.json()) if users_resp.ok else 'N/A'}")
 
+def print_default_blob_info(json_out):
+    print(json_out.keys())
+    print(f"name: {json_out['name']}")
+    print(f"description: {description}") if (description := json_out.get('description')) else None
+    print(f"namespaces: {namespace}") if (namespace := json_out.get('namespaces')) else None
+    print(f"authentication: {auth}") if (auth := json_out.get('authentication')) else None
+
 def main(base_url, show_all=False):
     base_url = base_url.rstrip("/")
     index_url = base_url + "/wp-json/"
@@ -43,18 +64,14 @@ def main(base_url, show_all=False):
 
     root_response = fetch_json(index_url)
 
-    # Try fallback if main /wp-json/ failed or is invalid
-    if not root_response or not root_response.ok or "routes" not in root_response.json():
-        fallback_url = base_url + "/wp-json/index.json"
-        print(f"[!] Fallback: Fetching API index from: {fallback_url}")
-        root_response = fetch_json(fallback_url)
+    json_output = root_response.json()
+    if not root_response or not root_response.ok or "routes" not in json_output:
+        print_result("ERR48", index_url, "No valid WP REST API 'routes' found.")
+        return
 
-        if not root_response or not root_response.ok or "routes" not in root_response.json():
-            print_result("ERR48", fallback_url, "No valid WP REST API 'routes' found.")
-            return
+    print_default_blob_info(json_output)
 
-
-    routes = root_response.json()["routes"]
+    routes = json_output["routes"]
     print(f"[+] Found {len(routes)} routes.\n")
 
     for route in routes:
