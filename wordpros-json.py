@@ -1,8 +1,10 @@
 import threading
+import json
 import time
 import sys
 from urllib.parse import urljoin
 import requests
+
 
 def fetch_json(url):
     if not url.startswith("http"):
@@ -128,21 +130,48 @@ def main(base_url, show_all=False):
 
         dostuffonstatus(resp, full_url, base_url, index_url, show_all)
 
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python wp_routes.py <url> [--all]")
-        sys.exit(1)
-
-    the_base_url = sys.argv[1]
-    the_show_all = "--all" in sys.argv
-
+def run_with_spinner(url, show_all):
     stop_spinner = threading.Event()
     spinner_thread = threading.Thread(target=spinner_task, args=(stop_spinner,))
-
     spinner_thread.start()
     try:
-        main(the_base_url, the_show_all)
+        main(url, show_all)
     finally:
         stop_spinner.set()
         spinner_thread.join()
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage:")
+        print("  python wp_routes.py <url> [--all]")
+        print("  python wp_routes.py --input file.json [--all]")
+        sys.exit(1)
+
+    show_all = "--all" in sys.argv
+
+    if "--input" in sys.argv:
+        try:
+            input_index = sys.argv.index("--input")
+            input_file = sys.argv[input_index + 1]
+        except IndexError:
+            print("[ERR] --input requires a filename.")
+            sys.exit(1)
+
+        try:
+            with open(input_file, 'r', encoding="utf-8") as f:
+                urls = json.load(f)
+        except Exception as e:
+            print(f"[ERR] Failed to load JSON file: {e}")
+            sys.exit(1)
+
+        if not isinstance(urls, list):
+            print("[ERR] JSON file must contain a list of URLs.")
+            sys.exit(1)
+
+        for url in urls:
+            print(f"\n[i] Processing: {url}")
+            run_with_spinner(url, show_all)
+
+    else:
+        base_url = sys.argv[1]
+        run_with_spinner(base_url, show_all)
