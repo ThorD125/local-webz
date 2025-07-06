@@ -143,8 +143,8 @@ def run_with_spinner(url, show_all):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python wp_routes.py <url> [--all]")
-        print("  python wp_routes.py --input file.json [--all]")
+        print("  python wordpros-json.py <url> [--all]")
+        print("  python wordpros-json.py --input file.json [--all]")
         sys.exit(1)
 
     show_all = "--all" in sys.argv

@@ -2,4 +2,5 @@ urls.json
 wordpress.json
 urls*.json
 wordpress*.json
-output/* 
+output/*
+node_modules/
