@@ -3,7 +3,7 @@ version: '3.9'
 services:
   db:
     image: postgres:16
-    restart: always
+    restart: unless-stopped
     env_file: .env
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -11,7 +11,9 @@ services:
 
   web:
     image: node:20
+    restart: unless-stopped
     working_dir: /usr/src/app
+    env_file: .env
     volumes:
       - ./web:/usr/src/app
       - ./output:/usr/src/app/output
@@ -28,9 +30,12 @@ services:
 
   cron:
     image: python:3.12
+    restart: unless-stopped
+    env_file: .env
     volumes:
       - ./cron:/app
       - ./output:/app/output
+      - ./.env:/app/.env
     working_dir: /app
     entrypoint: >
       sh -c "apt-get update && apt-get install -y cron && pip install psycopg2-binary python-dotenv &&
