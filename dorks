@@ -1,0 +1,8 @@
+inurl:"/wp-includes/user.php" -site:wordpress.org -site:github.com -site:fossies.org
+/wp-json/wp/v2/users/1
+/wp-json/wp/v2/users?per_page=100&page=1
+inurl:"/wp-json/" -wordpress
+allinurl:"wp-content/plugins/wordpress-popup/views/admin/"
+allinurl:"wp-content/plugins/wordpress-popup/views/conf/"
+intext:"the WordPress" inurl:wp-config ext:txt
+intext:"wordpress" filetype:xls login & password
