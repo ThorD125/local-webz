@@ -1,15 +1,13 @@
 import hashlib
 import os
-import json
-import requests
 import threading
 import time
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from pathlib import Path
-import hashlib
-import hashlib
-import re
+import requests
+from bs4 import BeautifulSoup
+
+from database import get_db_data
 
 # CONFIG
 OUTPUT_DIR = "./output"
@@ -64,7 +62,8 @@ def download_asset(session, base_url, tag, attr, asset_dir):
 
 
 
-def scrape_page(session, url, base_output):
+def scrape_page(session, url, css, js, frequency, base_output):
+    print(frequency)
     try:
         response = session.get(url, timeout=15)
         response.raise_for_status()
@@ -76,9 +75,9 @@ def scrape_page(session, url, base_output):
         for tag in soup.find_all(["script", "link", "img"]):
             if tag.name == "script" and tag.get("src"):
                 download_asset(session, response.url, tag, "src", asset_dir)
-            elif tag.name == "link" and "stylesheet" in (tag.get("rel") or []):
+            elif tag.name == "link" and "stylesheet" in (tag.get("rel") or []) and css:
                 download_asset(session, response.url, tag, "href", asset_dir)
-            elif tag.name == "img" and tag.get("src"):
+            elif tag.name == "img" and tag.get("src") and js:
                 download_asset(session, response.url, tag, "src", asset_dir)
 
 
@@ -95,21 +94,25 @@ def worker(urls, base_folder):
     session = requests.Session()
     session.headers.update(HEADERS)
     while urls:
-        url = urls.pop()
+        entry = urls.pop()
+        url = entry["url"]
+        css = entry["css"]
+        js = entry["js"]
+        frequency = entry["frequency"]
         folder = os.path.join(base_folder, sanitize_url(url))
-        scrape_page(session, url, folder)
+        scrape_page(session, url, css, js, frequency, folder)
 
-def main():
-    with open("urls.json", "r") as f:
-        url_list = json.load(f)
+
+if __name__ == "__main__":
+    url_list = get_db_data()
 
     timestamped_dir = os.path.join(OUTPUT_DIR, timestamp_folder())
     os.makedirs(timestamped_dir, exist_ok=True)
 
-    urls = url_list.copy()
+    url_list = url_list.copy()
     threads = []
     for _ in range(NUM_THREADS):
-        t = threading.Thread(target=worker, args=(urls, timestamped_dir))
+        t = threading.Thread(target=worker, args=(url_list, timestamped_dir))
         t.start()
         threads.append(t)
 
@@ -117,6 +120,3 @@ def main():
         t.join()
 
     print("[✓] All done.")
-
-if __name__ == "__main__":
-    main()
