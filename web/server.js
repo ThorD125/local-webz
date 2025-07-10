@@ -1,12 +1,8 @@
-const { Client } = require('pg');
+const express = require('express');
+const app = express();
 
-const client = new Client({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
+app.get('/', (_, res) => res.send('Hello from Node.js Web Server!'));
+
+app.listen(4000, () => {
+  console.log('Web server running on http://localhost:4000');
 });
-
-client.connect()
-  .then(() => console.log('Connected to PostgreSQL!'))
-  .catch(err => console.error('Connection error', err));
