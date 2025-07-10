@@ -22,6 +22,8 @@ services:
       DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       DB_HOST: db
+    ports:
+          - "4000:4000"
 
   cron:
     image: python:3.12
