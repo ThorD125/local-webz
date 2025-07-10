@@ -3,4 +3,4 @@ wordpress.json
 urls*.json
 wordpress*.json
 output/*
-node_modules/
+web/node_modules/
