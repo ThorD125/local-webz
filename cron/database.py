@@ -41,7 +41,8 @@ def get_db_data():
 
         return data
 
-    except:
+    except Exception as e:
+        print(e)
         sys.exit(1)
 
 if __name__ == "__main__":
