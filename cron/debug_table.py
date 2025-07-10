@@ -30,7 +30,11 @@ ORDER BY table_schema, table_name;
 """)
         rows = cursor.fetchall()
 
-        print(rows)
+        print(f"tables: {rows}")
+        cursor.execute("""SELECT * FROM url;""")
+        rows = cursor.fetchall()
+
+        print(f"urls: {rows}")
 
         cursor.close()
         conn.close()
