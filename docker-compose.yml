@@ -38,6 +38,6 @@ services:
       - ./.env:/app/.env
     working_dir: /app
     entrypoint: >
-      sh -c "apt-get update && apt-get install -y cron && pip install requests beautifulsoup4 psycopg2-binary python-dotenv && crontab crontab && cron -f"
+      sh -c "apt-get update && apt-get install -y cron && pip3 install --root-user-action requests beautifulsoup4 psycopg2-binary python-dotenv && crontab crontab && cron -f"
 volumes:
   db_data:
