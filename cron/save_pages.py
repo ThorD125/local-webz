@@ -15,7 +15,7 @@ NUM_THREADS = 5
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def timestamp_folder():
-    return time.strftime("%Y-%m-%d_%H-%M-%S")
+    return time.strftime("%Y-%m-%d_%H-%M")
 
 def sanitize_url(url):
     return urlparse(url).netloc.replace('.', '-') + urlparse(url).path.replace('/', '-').strip('-')

@@ -27,17 +27,13 @@ services:
       DB_HOST: db
     ports:
           - "4000:4000"
-
   cron:
-    image: python:3.12
+    build:
+      context: ./cron
     restart: unless-stopped
     env_file: .env
     volumes:
       - ./cron:/app
       - ./output:/app/output
-      - ./.env:/app/.env
-    working_dir: /app
-    entrypoint: >
-      sh -c "apt-get update && apt-get install -y cron && pip3 install --root-user-action requests beautifulsoup4 psycopg2-binary python-dotenv && crontab crontab && cron -f"
 volumes:
   db_data:
