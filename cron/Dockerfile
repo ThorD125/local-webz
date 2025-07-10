@@ -1,16 +1,16 @@
 FROM python:3.12
 
-# Install cron
+# Install cron and required packages
 RUN apt-get update && apt-get install -y cron
 
-# Install Python packages
+# Copy requirements and install Python packages
 COPY requirements.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Copy app files
+# Copy source code
 WORKDIR /app
 COPY . /app
 
-# Install crontab and keep cron running
-RUN crontab crontab
+# Install crontab and start cron
+RUN crontab /app/crontab
 CMD ["cron", "-f"]

@@ -1,1 +1,1 @@
-*/5 * * * * python3 /app/save_pages.py > /app/cron.log 2>&1
+*/5 * * * * /usr/local/bin/python3 /app/save_pages.py > /app/cron.log 2>&1
