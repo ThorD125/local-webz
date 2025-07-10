@@ -32,7 +32,8 @@ services:
       - ./cron:/app
       - ./output:/app/output
     working_dir: /app
-    entrypoint: [ "sh", "-c", "apt-get update && apt-get install -y cron && crontab crontab && cron -f" ]
-
+    entrypoint: >
+      sh -c "apt-get update && apt-get install -y cron && pip install psycopg2-binary python-dotenv &&
+            crontab crontab && cron -f"
 volumes:
   db_data:
